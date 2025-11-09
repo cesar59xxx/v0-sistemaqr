@@ -1,36 +1,82 @@
-# Use Node.js 20 Alpine
-FROM node:20-alpine
+# Dockerfile.multi
+# v0.8.1-rc1
 
-# Install dependencies for building
-RUN apk add --no-cache libc6-compat
-
-# Set working directory
+# Base for all builds
+FROM node:20-alpine AS base-min
+# Install jemalloc
+RUN apk add --no-cache jemalloc
+# Set environment variable to use jemalloc
+ENV LD_PRELOAD=/usr/lib/libjemalloc.so.2
 WORKDIR /app
+RUN apk --no-cache add curl
+RUN npm config set fetch-retry-maxtimeout 600000 && \
+    npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 15000
+COPY package*.json ./
+COPY packages/data-provider/package*.json ./packages/data-provider/
+COPY packages/api/package*.json ./packages/api/
+COPY packages/data-schemas/package*.json ./packages/data-schemas/
+COPY packages/client/package*.json ./packages/client/
+COPY client/package*.json ./client/
+COPY api/package*.json ./api/
 
-# Copy package files
-COPY package.json ./
+# Install all dependencies for every build
+FROM base-min AS base
+WORKDIR /app
+RUN npm ci
 
-# Install ALL dependencies (including dev dependencies for build)
-RUN npm install --legacy-peer-deps --verbose
+# Build `data-provider` package
+FROM base AS data-provider-build
+WORKDIR /app/packages/data-provider
+COPY packages/data-provider ./
+RUN npm run build
 
-# Copy all project files
-COPY . .
+# Build `data-schemas` package
+FROM base AS data-schemas-build
+WORKDIR /app/packages/data-schemas
+COPY packages/data-schemas ./
+COPY --from=data-provider-build /app/packages/data-provider/dist /app/packages/data-provider/dist
+RUN npm run build
 
-# Set environment variables for build
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV NODE_ENV=production
+# Build `api` package
+FROM base AS api-package-build
+WORKDIR /app/packages/api
+COPY packages/api ./
+COPY --from=data-provider-build /app/packages/data-provider/dist /app/packages/data-provider/dist
+COPY --from=data-schemas-build /app/packages/data-schemas/dist /app/packages/data-schemas/dist
+RUN npm run build
 
-# Build the application with verbose output
-RUN echo "Starting Next.js build..." && \
-    npm run build 2>&1 | tee build.log || \
-    (echo "Build failed! Check build.log for details" && cat build.log && exit 1)
+# Build `client` package
+FROM base AS client-package-build
+WORKDIR /app/packages/client
+COPY packages/client ./
+RUN npm run build
 
-# Expose port
-EXPOSE 3000
+# Client build
+FROM base AS client-build
+WORKDIR /app/client
+COPY client ./
+COPY --from=data-provider-build /app/packages/data-provider/dist /app/packages/data-provider/dist
+COPY --from=client-package-build /app/packages/client/dist /app/packages/client/dist
+COPY --from=client-package-build /app/packages/client/src /app/packages/client/src
+ENV NODE_OPTIONS="--max-old-space-size=2048"
+RUN npm run build
 
-# Set environment variables for runtime
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-# Start the application
-CMD ["npm", "start"]
+# API setup (including client dist)
+FROM base-min AS api-build
+# Add `uv` for extended MCP support
+COPY --from=ghcr.io/astral-sh/uv:0.6.13 /uv /uvx /bin/
+RUN uv --version
+WORKDIR /app
+# Install only production deps
+RUN npm ci --omit=dev
+COPY api ./api
+COPY config ./config
+COPY --from=data-provider-build /app/packages/data-provider/dist ./packages/data-provider/dist
+COPY --from=data-schemas-build /app/packages/data-schemas/dist ./packages/data-schemas/dist
+COPY --from=api-package-build /app/packages/api/dist ./packages/api/dist
+COPY --from=client-build /app/client/dist ./client/dist
+WORKDIR /app/api
+EXPOSE 3080
+ENV HOST=0.0.0.0
+CMD ["node", "server/index.js"]
