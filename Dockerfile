@@ -1,53 +1,36 @@
-# Stage 1: Dependencies
-FROM node:20-alpine AS deps
+# Use Node.js 20 Alpine
+FROM node:20-alpine
+
+# Install dependencies for building
 RUN apk add --no-cache libc6-compat
+
+# Set working directory
 WORKDIR /app
 
 # Copy package files
 COPY package.json ./
 
-# Install dependencies
-RUN npm install --legacy-peer-deps
+# Install ALL dependencies (including dev dependencies for build)
+RUN npm install --legacy-peer-deps --verbose
 
-# Stage 2: Builder
-FROM node:20-alpine AS builder
-WORKDIR /app
-
-# Copy dependencies from deps stage
-COPY --from=deps /app/node_modules ./node_modules
+# Copy all project files
 COPY . .
 
-# Disable telemetry during build
+# Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# Build application
-RUN npm run build
+# Build the application with verbose output
+RUN echo "Starting Next.js build..." && \
+    npm run build 2>&1 | tee build.log || \
+    (echo "Build failed! Check build.log for details" && cat build.log && exit 1)
 
-# Stage 3: Runner
-FROM node:20-alpine AS runner
-WORKDIR /app
-
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-# Copy necessary files
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
-
-# Set correct permissions
-RUN chown -R nextjs:nodejs /app
-
-USER nextjs
-
+# Expose port
 EXPOSE 3000
 
+# Set environment variables for runtime
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
+# Start the application
 CMD ["npm", "start"]
