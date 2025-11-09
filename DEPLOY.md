@@ -152,6 +152,98 @@ docker compose up -d
 
 ---
 
+## Scripts Automáticos
+
+O projeto inclui scripts bash para facilitar o deploy e manutenção:
+
+### Deploy Completo
+\`\`\`bash
+# Torna o script executável
+chmod +x scripts/deploy.sh
+
+# Executa o deploy
+./scripts/deploy.sh
+
+# Ou use o Makefile
+make deploy
+\`\`\`
+
+### Atualizar Aplicação
+\`\`\`bash
+chmod +x scripts/update.sh
+./scripts/update.sh
+
+# Ou
+make update
+\`\`\`
+
+### Criar Backup
+\`\`\`bash
+chmod +x scripts/backup.sh
+./scripts/backup.sh
+
+# Ou
+make backup
+\`\`\`
+
+### Ver Logs
+\`\`\`bash
+chmod +x scripts/logs.sh
+./scripts/logs.sh
+
+# Com número específico de linhas
+./scripts/logs.sh 200
+
+# Ou
+make logs
+\`\`\`
+
+### Usando Makefile
+
+O projeto inclui um Makefile com comandos úteis:
+
+\`\`\`bash
+make help      # Ver todos os comandos disponíveis
+make build     # Build da aplicação
+make start     # Iniciar containers
+make stop      # Parar containers
+make restart   # Reiniciar
+make logs      # Ver logs
+make status    # Ver status
+make clean     # Limpar tudo
+\`\`\`
+
+---
+
+## Deploy Automatizado com GitHub Actions
+
+O projeto está configurado para deploy automático via GitHub Actions.
+
+### Configuração
+
+1. No GitHub, vá em Settings > Secrets and variables > Actions
+2. Adicione os seguintes secrets:
+   - `VPS_HOST`: IP ou domínio da sua VPS
+   - `VPS_USERNAME`: Usuário SSH (geralmente root)
+   - `VPS_SSH_KEY`: Chave SSH privada
+
+### Como Funciona
+
+Toda vez que você fizer push para a branch `main`, o GitHub Actions:
+1. Conecta na VPS via SSH
+2. Faz git pull do código mais recente
+3. Rebuilda os containers Docker
+4. Reinicia a aplicação
+
+### Deploy Manual via GitHub
+
+Você também pode disparar o deploy manualmente:
+1. Vá em Actions no GitHub
+2. Selecione "Deploy to VPS"
+3. Clique em "Run workflow"
+
+---
+
 ## Comandos Úteis
 
 ### Docker

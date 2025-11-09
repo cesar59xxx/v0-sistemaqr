@@ -1,0 +1,43 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn.lock
+package-lock.json
+
+# Next.js
+.next
+out
+build
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# Development
+.git
+.gitignore
+README.md
+.vscode
+.idea
+
+# Testing
+coverage
+.nyc_output
+__tests__
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+
+# Logs
+logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.pem
+.cache
