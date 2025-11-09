@@ -19,12 +19,8 @@ apt update && apt upgrade -y
 curl -fsSL https://get.docker.com -o get-docker.sh
 sh get-docker.sh
 
-# Instalar Docker Compose
-apt install docker-compose -y
-
-# Verificar instalação
-docker --version
-docker-compose --version
+# O Docker Compose v2 vem integrado com o Docker
+docker compose version
 \`\`\`
 
 ### 3. Instalar Git
@@ -37,31 +33,33 @@ apt install git -y
 
 \`\`\`bash
 cd /var/www
-git clone https://github.com/seu-usuario/whatsapp-saas.git
-cd whatsapp-saas
+git clone https://github.com/cesar59xxx/v0-sistema.git
+cd v0-sistema
 \`\`\`
 
 ### 5. Build e Iniciar a Aplicação
 
 \`\`\`bash
 # Build dos containers
-docker-compose build
+docker compose build
 
 # Iniciar em background
-docker-compose up -d
+docker compose up -d
 
 # Verificar logs
-docker-compose logs -f
+docker compose logs -f
 \`\`\`
 
 ### 6. Verificar Status
 
 \`\`\`bash
 # Ver containers rodando
-docker-compose ps
+docker compose ps
 
 # Ver logs em tempo real
-docker-compose logs -f app
+docker compose logs -f app
+
+curl http://localhost:3000/api/health
 \`\`\`
 
 A aplicação estará disponível em `http://seu-ip-vps:3000`
@@ -140,16 +138,16 @@ certbot renew --dry-run
 ### 1. Baixar Mudanças
 
 \`\`\`bash
-cd /var/www/whatsapp-saas
+cd /var/www/v0-sistema
 git pull origin main
 \`\`\`
 
 ### 2. Rebuild e Restart
 
 \`\`\`bash
-docker-compose down
-docker-compose build
-docker-compose up -d
+docker compose down
+docker compose build --no-cache
+docker compose up -d
 \`\`\`
 
 ---
@@ -159,16 +157,18 @@ docker-compose up -d
 ### Docker
 \`\`\`bash
 # Parar aplicação
-docker-compose down
+docker compose down
 
 # Reiniciar
-docker-compose restart
+docker compose restart
 
 # Ver logs
-docker-compose logs -f app
+docker compose logs -f app
 
 # Limpar volumes
-docker-compose down -v
+docker compose down -v
+
+docker compose build --no-cache
 \`\`\`
 
 ### Nginx
@@ -201,22 +201,40 @@ netstat -tulpn
 
 ### Aplicação não inicia
 \`\`\`bash
-# Verificar logs
-docker-compose logs app
+# Verificar logs detalhados
+docker compose logs app
 
 # Verificar porta 3000
 netstat -tulpn | grep 3000
 
-# Rebuild completo
-docker-compose down
+docker compose down
 docker system prune -a
-docker-compose up -d --build
+docker compose up -d --build
+\`\`\`
+
+### Erro "npm ci failed"
+\`\`\`bash
+# O projeto agora usa npm install ao invés de npm ci
+# Se o erro persistir, limpe completamente e rebuilde:
+docker compose down -v
+docker system prune -a --volumes
+docker compose build --no-cache
+docker compose up -d
+\`\`\`
+
+### Problemas com node_modules
+\`\`\`bash
+# Limpar cache do npm e rebuild
+docker compose down
+docker builder prune -a
+docker compose build --no-cache --pull
+docker compose up -d
 \`\`\`
 
 ### Nginx erro 502
 \`\`\`bash
 # Verificar se app está rodando
-docker-compose ps
+docker compose ps
 
 # Ver logs do nginx
 tail -f /var/log/nginx/error.log
@@ -233,15 +251,31 @@ du -sh /* | sort -h
 
 ---
 
+## Notas Importantes
+
+### Docker Compose v2
+Este projeto usa Docker Compose v2 (comando `docker compose` sem hífen). Se você ainda tem a versão antiga (`docker-compose` com hífen), ela deve funcionar, mas recomenda-se atualizar.
+
+### Package Manager
+O projeto usa `npm install` ao invés de `npm ci` pois o Next.js runtime não gera `package-lock.json`. Isso é normal e não afeta a funcionalidade.
+
+### Credenciais Padrão
+- Email: admin@demo.com
+- Senha: admin123
+
+**IMPORTANTE:** Altere estas credenciais na primeira vez que fizer login em produção!
+
+---
+
 ## Backup
 
 ### Criar Backup
 \`\`\`bash
 # Backup do código
-tar -czf backup-$(date +%Y%m%d).tar.gz /var/www/whatsapp-saas
+tar -czf backup-$(date +%Y%m%d).tar.gz /var/www/v0-sistema
 
 # Backup dos dados (se houver volume)
-docker-compose exec app tar -czf /backup.tar.gz /data
+docker compose exec app tar -czf /backup.tar.gz /data
 \`\`\`
 
 ### Restaurar Backup
@@ -259,7 +293,7 @@ tar -xzf backup-20250109.tar.gz -C /var/www/
 docker stats
 
 # Logs em tempo real
-docker-compose logs -f --tail=100
+docker compose logs -f --tail=100
 \`\`\`
 
 ### Health Check
@@ -289,5 +323,3 @@ apt update && apt upgrade -y
 4. **Configurar fail2ban**
 \`\`\`bash
 apt install fail2ban -y
-\`\`\`
-\`\`\`
